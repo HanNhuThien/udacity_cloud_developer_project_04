@@ -1,8 +1,34 @@
+import { DynamoDB } from '@aws-sdk/client-dynamodb'
+import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb'
+import { v4 as uuidv4 } from 'uuid'
 
-export function handler(event) {
-  const newTodo = JSON.parse(event.body)
+const dynamoDbDocument = DynamoDBDocument.from(new DynamoDB())
 
-  // TODO: Implement creating a new TODO item
-  return undefined
+const todosTable = process.env.TODOS_TABLE
+
+export async function handler(event) {
+  console.log('Processing event: ', event)
+
+  const parsedBody = JSON.parse(event.body)
+
+  const newItem = {
+    userId: uuidv4(),
+    todoId: uuidv4(),
+    ...parsedBody
+  }
+
+  await dynamoDbDocument.put({
+    TableName: todosTable,
+    Item: newItem
+  })
+
+  return {
+    statusCode: 201,
+    headers: {
+      'Access-Control-Allow-Origin': '*'
+    },
+    body: JSON.stringify({
+      newItem
+    })
+  }
 }
-

@@ -1,3 +1,5 @@
+org: ivy21
+app: serverless-todo-app
 service: serverless-todo-app
 
 plugins:
@@ -7,10 +9,36 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: nodejs14.x
+  profile: serverless
+  runtime: nodejs16.x
+  environment:
+    TODOS_TABLE: awsProject04Todos-${self:provider.stage}
+    TODOS_CREATED_AT_INDEX: TodosCreatedAtIndex
+
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Scan
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:DeleteItem
+          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+        # - Effect: Allow
+        #   Action:
+        #     - dynamodb:Query
+        #     - dynamodb:PutItem
+        #   Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}
+        # - Effect: Allow
+        #   Action:
+        #     - dynamodb:Query
+        #   Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}/index/${self:provider.environment.IMAGE_ID_INDEX}
 
 functions:
-
   Auth:
     handler: src/lambda/auth/auth0Authorizer.handler
 
@@ -21,6 +49,10 @@ functions:
       - http:
           method: get
           path: todos
+          cors: true
+    #       authorizer: Auth
+    # iamRoleStatementsInherit: true
+    # role: iamRoleGetTodos
 
   # TODO: Configure this function
   CreateTodo:
@@ -29,7 +61,7 @@ functions:
       - http:
           method: post
           path: todos
-
+    # role: iamRoleCreateTodo
   # TODO: Configure this function
   UpdateTodo:
     handler: src/lambda/http/updateTodo.handler
@@ -37,6 +69,7 @@ functions:
       - http:
           method: patch
           path: todos/{todoId}
+    # role: iamRoleCreateTodo
 
   # TODO: Configure this function
   DeleteTodo:
@@ -45,15 +78,119 @@ functions:
       - http:
           method: delete
           path: todos/{todoId}
+    # role: iamRoleCreateTodo
 
   # TODO: Configure this function
-  GenerateUploadUrl:
-    handler: src/lambda/http/generateUploadUrl.handler
-    events:
-      - http:
-          method: post
-          path: todos/{todoId}/attachment
+  # GenerateUploadUrl:
+  #   handler: src/lambda/http/generateUploadUrl.handler
+  #   events:
+  #     - http:
+  #         method: post
+  #         path: todos/{todoId}/attachment
+  #   iam:
+  #     role:
+  #       statements:
+  #         - Effect: Allow
+  #           Action:
+  #             - dynamodb:PutItem
+  #           Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
 
 resources:
   Resources:
-    # TODO: Add any necessary AWS resources
+    TodosDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: todoId
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+          # - AttributeName: name
+          #   AttributeType: S
+          # - AttributeName: dueDate
+          #   AttributeType: S
+          # - AttributeName: done
+          #   AttributeType: BOOL
+          # - AttributeName: attachmentUrl
+          #   AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+          - AttributeName: todoId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:provider.environment.TODOS_TABLE}
+        LocalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.TODOS_CREATED_AT_INDEX}
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL # What attributes will be copied to an index
+      # ImagesDynamoDBTable:
+      #   Type: 'AWS::DynamoDB::Table'
+      #   Properties:
+      #     AttributeDefinitions:
+      #       - AttributeName: groupId
+      #         AttributeType: S
+      #       - AttributeName: timestamp
+      #         AttributeType: S
+      #       - AttributeName: imageId
+      #         AttributeType: S
+      #     KeySchema:
+      #       - AttributeName: groupId
+      #         KeyType: HASH
+      #       - AttributeName: timestamp
+      #         KeyType: RANGE
+      #     BillingMode: PAY_PER_REQUEST
+      #     TableName: ${self:provider.environment.IMAGES_TABLE}
+      #     GlobalSecondaryIndexes:
+      #       - IndexName: ${self:provider.environment.IMAGE_ID_INDEX}
+      #         KeySchema:
+      #           - AttributeName: imageId
+      #             KeyType: HASH
+      #         Projection:
+      #           ProjectionType: ALL
+    # iamRoleCreateTodo:
+    #   Type: AWS::IAM::Role
+    #   Properties:
+    #     AssumeRolePolicyDocument:
+    #       Version: '2012-10-17'
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             Service: lambda.amazonaws.com
+    #           Action: sts:AssumeRole
+    #     Policies:
+    #       - PolicyName: CreateTodoPolicy
+    #         PolicyDocument:
+    #           Version: '2012-10-17'
+    #           Statement:
+    #             - Effect: Allow
+    #               Action:
+    #                 - dynamodb:PutItem
+    #               Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+    # iamRoleGetTodos:
+    #   Type: AWS::IAM::Role
+    #   Properties:
+    #     AssumeRolePolicyDocument:
+    #       Version: '2024-12-14'
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             Service: lambda.amazonaws.com
+    #           Action: sts:AssumeRole
+    #     Policies:
+    #       - PolicyName: CreateTodoPolicy
+    #         PolicyDocument:
+    #           Version: '2024-12-14'
+    #           Statement:
+    #             - Effect: Allow
+    #               Action:
+    #                 - dynamodb:Query
+    #                 - dynamodb:GetItem
+    #               Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
