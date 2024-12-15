@@ -10,8 +10,10 @@ export async function handler(event) {
   logger.info('Processing event: ', { event })
 
   const name = JSON.parse(event.body).name
+  
+  const isNameInvalid = isTodoNameInvalid(name)
 
-  if (isTodoNameInvalid(name)) {
+  if (isNameInvalid) {
     return {
       statusCode: 400,
       headers: {
