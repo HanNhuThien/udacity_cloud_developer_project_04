@@ -1,4 +1,4 @@
-
+import { getUserId } from '../utils.mjs'
 import { v4 as uuidv4 } from 'uuid'
 import { createLogger } from '../../utils/logger.mjs'
 import { dbCreateTodo } from '../../dataLayer/todosAccess.mjs'
@@ -9,9 +9,8 @@ const logger = createLogger('createTodo')
 export async function handler(event) {
   logger.info('Processing event: ', { event })
 
-  const name = JSON.parse(event.body).name
-  
-  const isNameInvalid = isTodoNameInvalid(name)
+  const parsedBody = JSON.parse(event.body)
+  const isNameInvalid = isTodoNameInvalid(parsedBody.name)
 
   if (isNameInvalid) {
     return {
