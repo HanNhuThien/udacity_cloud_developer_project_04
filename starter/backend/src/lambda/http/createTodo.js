@@ -1,22 +1,17 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb'
-import { v4 as uuidv4 } from 'uuid'
-import { getUserId } from '../utils.mjs'
-import AWSXRay from 'aws-xray-sdk-core'
-import { createLogger } from '../../utils/logger.mjs'
 
-const dynamoDbClient = new DynamoDBClient()
-const dynamoDbXRay = AWSXRay.captureAWSv3Client(dynamoDbClient)
-const dynamoDBDocument = DynamoDBDocument.from(dynamoDbXRay)
+import { v4 as uuidv4 } from 'uuid'
+import { createLogger } from '../../utils/logger.mjs'
+import { dbCreateTodo } from '../../dataLayer/todosAccess.mjs'
+import { isTodoNameInvalid } from '../../businessLogic/todos.mjs'
+
 const logger = createLogger('createTodo')
-const todosTable = process.env.TODOS_TABLE
 
 export async function handler(event) {
   logger.info('Processing event: ', { event })
 
-  const parsedBody = JSON.parse(event.body)
+  const name = JSON.parse(event.body).name
 
-  if (!parsedBody.name || parsedBody.name.trim() === '') {
+  if (isTodoNameInvalid(name)) {
     return {
       statusCode: 400,
       headers: {
@@ -29,9 +24,7 @@ export async function handler(event) {
   }
 
   const userId = getUserId(event)
-
   const todoId = uuidv4()
-
   const newItem = {
     userId: userId,
     todoId: todoId,
@@ -40,10 +33,7 @@ export async function handler(event) {
     ...parsedBody
   }
 
-  await dynamoDBDocument.put({
-    TableName: todosTable,
-    Item: newItem
-  })
+  await dbCreateTodo(newItem)
 
   return {
     statusCode: 201,
