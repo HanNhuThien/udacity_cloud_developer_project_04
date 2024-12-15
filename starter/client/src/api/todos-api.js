@@ -17,17 +17,24 @@ export async function getTodos(idToken) {
 }
 
 export async function createTodo(idToken, newTodo) {
-  const response = await Axios.post(
-    `${process.env.REACT_APP_API_ENDPOINT}/todos`,
-    JSON.stringify(newTodo),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${idToken}`
+  try {
+    const response = await Axios.post(
+      `${process.env.REACT_APP_API_ENDPOINT}/todos`,
+      JSON.stringify(newTodo),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`
+        }
       }
+    )
+    return response.data.item
+  } catch (error) {
+    if (error?.response?.status === 400) {
+      alert(error?.response?.data.message)
     }
-  )
-  return response.data.item
+    throw error
+  }
 }
 
 export async function patchTodo(idToken, todoId, updatedTodo) {

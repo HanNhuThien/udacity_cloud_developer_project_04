@@ -1,13 +1,18 @@
-import { DynamoDB } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb';
 import { getUserId } from '../utils.mjs'
+import AWSXRay from 'aws-xray-sdk-core'
+import { createLogger } from '../../utils/logger.mjs'
 
-const dynamoDbDocument = DynamoDBDocument.from(new DynamoDB())
+const dynamoDbClient = new DynamoDBClient();
+const dynamoDbXRay = AWSXRay.captureAWSv3Client(dynamoDbClient);
+const dynamoDBDocument = DynamoDBDocument.from(dynamoDbXRay);
+const logger = createLogger('updateTodo')
 
 const todosTable = process.env.TODOS_TABLE
 
 export async function handler(event) {
-  console.log('Processing event: ', event)
+  logger.info('Processing event: ', {event})
 
   const userId = getUserId(event)
   const todoId = event.pathParameters.todoId
@@ -30,7 +35,7 @@ export async function handler(event) {
     ReturnValues: "ALL_NEW",
   }
 
-  const updatedTodo = await dynamoDbDocument.update(params)
+  const updatedTodo = await dynamoDBDocument.update(params)
 
   return {
     statusCode: 200,

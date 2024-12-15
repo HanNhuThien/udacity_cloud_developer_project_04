@@ -11,41 +11,27 @@ provider:
   name: aws
   profile: serverless
   runtime: nodejs16.x
+  tracing:
+    lambda: true
+    apiGateway: true
   environment:
     TODOS_TABLE: awsProject04Todos-${self:provider.stage}
     TODOS_CREATED_AT_INDEX: TodosCreatedAtIndex
     TODOS_S3_BUCKET: aws-project-04-bucket
     SIGNED_URL_EXPIRATION: 300
+    REACT_APP_AUTH0_DOMAIN: dev-rebc7lzbf8qf71ke.us.auth0.com
 
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
 
   iam:
     role:
-      statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:Scan
-            - dynamodb:PutItem
-            - dynamodb:GetItem
-            - dynamodb:DeleteItem
-            - dynamodb:UpdateItem
-          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
-        # - Effect: Allow
-        #   Action:
-        #     - dynamodb:Query
-        #     - dynamodb:PutItem
-        #   Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}
-        # - Effect: Allow
-        #   Action:
-        #     - dynamodb:Query
-        #   Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.IMAGES_TABLE}/index/${self:provider.environment.IMAGE_ID_INDEX}
-
+      statements: []
+      
 functions:
   Auth:
     handler: src/lambda/auth/auth0Authorizer.handler
 
-  # TODO: Configure this function
   GetTodos:
     handler: src/lambda/http/getTodos.handler
     events:
@@ -54,10 +40,12 @@ functions:
           path: todos
           cors: true
           authorizer: Auth
-    # iamRoleStatementsInherit: true
-    # role: iamRoleGetTodos
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
 
-  # TODO: Configure this function
   CreateTodo:
     handler: src/lambda/http/createTodo.handler
     events:
@@ -66,8 +54,12 @@ functions:
           path: todos
           cors: true
           authorizer: Auth
-    # role: iamRoleCreateTodo
-  # TODO: Configure this function
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+
   UpdateTodo:
     handler: src/lambda/http/updateTodo.handler
     events:
@@ -76,9 +68,12 @@ functions:
           path: todos/{todoId}
           authorizer: Auth
           cors: true
-    # role: iamRoleCreateTodo
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
 
-  # TODO: Configure this function
   DeleteTodo:
     handler: src/lambda/http/deleteTodo.handler
     events:
@@ -87,7 +82,11 @@ functions:
           path: todos/{todoId}
           authorizer: Auth
           cors: true
-    # role: iamRoleCreateTodo
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:DeleteItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
 
   GenerateUploadUrl:
     handler: src/lambda/http/generateUploadUrl.handler
@@ -97,6 +96,11 @@ functions:
           path: todos/{todoId}/attachment
           authorizer: Auth
           cors: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
 
 resources:
   Resources:

@@ -1,22 +1,34 @@
 import { createLogger } from '../../utils/logger.mjs'
-import { DynamoDB } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb';
+import { getUserId } from '../utils.mjs'
+import AWSXRay from 'aws-xray-sdk-core'
 
-// const logger = createLogger('getTodos')
+const dynamoDbClient = new DynamoDBClient();
+const dynamoDbXRay = AWSXRay.captureAWSv3Client(dynamoDbClient);
+const dynamoDBDocument = DynamoDBDocument.from(dynamoDbXRay);
 
-const dynamoDbClient = DynamoDBDocument.from(new DynamoDB())
+const logger = createLogger('getTodos')
 
 const todosTable = process.env.TODOS_TABLE
 
 export async function handler(event) {
-  console.log('Processing event: ', event)
 
-  const scanCommand = {
-    TableName: todosTable
-  }
-  const result = await dynamoDbClient.scan(scanCommand)
+  logger.info('Processing event: ', {event})
+
+  const userId = getUserId(event)
+
+  const queryCommand = {
+    TableName: todosTable,
+    KeyConditionExpression: "userId = :userId",
+    ExpressionAttributeValues: {
+      ":userId": userId,
+    },
+  };
+
+  const result = await dynamoDBDocument.query(queryCommand)
   const items = result.Items
-
+  
   return {
     statusCode: 200,
     headers: {

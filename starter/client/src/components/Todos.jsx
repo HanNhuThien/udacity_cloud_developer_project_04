@@ -133,12 +133,12 @@ export function Todos() {
           audience: `https://${domain}/api/v2/`,
           scope: 'read:todos'
         })
-        // console.log('Access token: ' + accessToken)
+        console.log('Access token: ' + accessToken)
         const todos = await getTodos(accessToken)
         setTodos(todos)
         setLoadingTodos(false)
       } catch (e) {
-        alert(`Failed to fetch todos: ${e.message}`)
+        alert(`Failed to fetch todos: ${e}`)
       }
     }
     foo()
