@@ -1,6 +1,7 @@
 import { DynamoDB } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocument } from '@aws-sdk/lib-dynamodb'
 import { v4 as uuidv4 } from 'uuid'
+import { getUserId } from '../utils.mjs'
 
 const dynamoDbDocument = DynamoDBDocument.from(new DynamoDB())
 
@@ -11,9 +12,15 @@ export async function handler(event) {
 
   const parsedBody = JSON.parse(event.body)
 
+  const userId = getUserId(event)
+
+  const todoId = uuidv4()
+
   const newItem = {
-    userId: uuidv4(),
-    todoId: uuidv4(),
+    userId: userId,
+    todoId: todoId,
+    createdAt: new Date().toLocaleTimeString(),
+    done: false,
     ...parsedBody
   }
 
@@ -28,7 +35,7 @@ export async function handler(event) {
       'Access-Control-Allow-Origin': '*'
     },
     body: JSON.stringify({
-      newItem
+      item : newItem
     })
   }
 }

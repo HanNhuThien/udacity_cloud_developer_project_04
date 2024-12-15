@@ -14,6 +14,8 @@ provider:
   environment:
     TODOS_TABLE: awsProject04Todos-${self:provider.stage}
     TODOS_CREATED_AT_INDEX: TodosCreatedAtIndex
+    TODOS_S3_BUCKET: aws-project-04-bucket
+    SIGNED_URL_EXPIRATION: 300
 
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
@@ -27,6 +29,7 @@ provider:
             - dynamodb:PutItem
             - dynamodb:GetItem
             - dynamodb:DeleteItem
+            - dynamodb:UpdateItem
           Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
         # - Effect: Allow
         #   Action:
@@ -50,7 +53,7 @@ functions:
           method: get
           path: todos
           cors: true
-    #       authorizer: Auth
+          authorizer: Auth
     # iamRoleStatementsInherit: true
     # role: iamRoleGetTodos
 
@@ -61,6 +64,8 @@ functions:
       - http:
           method: post
           path: todos
+          cors: true
+          authorizer: Auth
     # role: iamRoleCreateTodo
   # TODO: Configure this function
   UpdateTodo:
@@ -69,6 +74,8 @@ functions:
       - http:
           method: patch
           path: todos/{todoId}
+          authorizer: Auth
+          cors: true
     # role: iamRoleCreateTodo
 
   # TODO: Configure this function
@@ -78,22 +85,18 @@ functions:
       - http:
           method: delete
           path: todos/{todoId}
+          authorizer: Auth
+          cors: true
     # role: iamRoleCreateTodo
 
-  # TODO: Configure this function
-  # GenerateUploadUrl:
-  #   handler: src/lambda/http/generateUploadUrl.handler
-  #   events:
-  #     - http:
-  #         method: post
-  #         path: todos/{todoId}/attachment
-  #   iam:
-  #     role:
-  #       statements:
-  #         - Effect: Allow
-  #           Action:
-  #             - dynamodb:PutItem
-  #           Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+  GenerateUploadUrl:
+    handler: src/lambda/http/generateUploadUrl.handler
+    events:
+      - http:
+          method: post
+          path: todos/{todoId}/attachment
+          authorizer: Auth
+          cors: true
 
 resources:
   Resources:
@@ -130,67 +133,40 @@ resources:
               - AttributeName: createdAt
                 KeyType: RANGE
             Projection:
-              ProjectionType: ALL # What attributes will be copied to an index
-      # ImagesDynamoDBTable:
-      #   Type: 'AWS::DynamoDB::Table'
-      #   Properties:
-      #     AttributeDefinitions:
-      #       - AttributeName: groupId
-      #         AttributeType: S
-      #       - AttributeName: timestamp
-      #         AttributeType: S
-      #       - AttributeName: imageId
-      #         AttributeType: S
-      #     KeySchema:
-      #       - AttributeName: groupId
-      #         KeyType: HASH
-      #       - AttributeName: timestamp
-      #         KeyType: RANGE
-      #     BillingMode: PAY_PER_REQUEST
-      #     TableName: ${self:provider.environment.IMAGES_TABLE}
-      #     GlobalSecondaryIndexes:
-      #       - IndexName: ${self:provider.environment.IMAGE_ID_INDEX}
-      #         KeySchema:
-      #           - AttributeName: imageId
-      #             KeyType: HASH
-      #         Projection:
-      #           ProjectionType: ALL
-    # iamRoleCreateTodo:
-    #   Type: AWS::IAM::Role
-    #   Properties:
-    #     AssumeRolePolicyDocument:
-    #       Version: '2012-10-17'
-    #       Statement:
-    #         - Effect: Allow
-    #           Principal:
-    #             Service: lambda.amazonaws.com
-    #           Action: sts:AssumeRole
-    #     Policies:
-    #       - PolicyName: CreateTodoPolicy
-    #         PolicyDocument:
-    #           Version: '2012-10-17'
-    #           Statement:
-    #             - Effect: Allow
-    #               Action:
-    #                 - dynamodb:PutItem
-    #               Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
-    # iamRoleGetTodos:
-    #   Type: AWS::IAM::Role
-    #   Properties:
-    #     AssumeRolePolicyDocument:
-    #       Version: '2024-12-14'
-    #       Statement:
-    #         - Effect: Allow
-    #           Principal:
-    #             Service: lambda.amazonaws.com
-    #           Action: sts:AssumeRole
-    #     Policies:
-    #       - PolicyName: CreateTodoPolicy
-    #         PolicyDocument:
-    #           Version: '2024-12-14'
-    #           Statement:
-    #             - Effect: Allow
-    #               Action:
-    #                 - dynamodb:Query
-    #                 - dynamodb:GetItem
-    #               Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+              ProjectionType: ALL
+
+    AttachmentsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.TODOS_S3_BUCKET}
+        PublicAccessBlockConfiguration:
+          BlockPublicPolicy: false
+          RestrictPublicBuckets: false
+        CorsConfiguration:
+          CorsRules:
+              -
+                AllowedOrigins:
+                  - '*'
+                AllowedHeaders:
+                  - '*'
+                AllowedMethods:
+                  - GET
+                  - PUT
+                  - POST
+                  - DELETE
+                  - HEAD
+                MaxAge: 3000
+
+    BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        PolicyDocument:
+          Id: MyPolicy
+          Version: "2012-10-17"
+          Statement:
+            - Sid: PublicReadForGetBucketObjects
+              Effect: Allow
+              Principal: '*'
+              Action: 's3:*'
+              Resource: 'arn:aws:s3:::${self:provider.environment.TODOS_S3_BUCKET}/*'
+        Bucket: !Ref AttachmentsBucket
